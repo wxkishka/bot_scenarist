@@ -1,0 +1,10 @@
+# TOKEN = '6787855008:AAFNpFZ-Y1DD_x1mV0UYoPqH0AVwTW9iacQ'
+TOKEN = '5924781016:AAFe6DmVlFmhFGWE18Y-wSfFN6gcHzrh3Zk'
+GPT_URL = 'http://localhost:1234/v1/chat/completions'
+HEADERS = {"Content-Type": "application/json"}
+MAX_TOKENS = 100
+MAX_LETTERS = 150
+SUBJECT = 'biology'
+SYSTEM_CONTENT = f'Предмет - {SUBJECT}. Отвечай подробно на русском языке.'
+ASSISTANT_CONTENT = 'Решим задачу по шагам:'
+MODEL_NAME = "mistralai_mistral-7b-instruct-v0.1"
