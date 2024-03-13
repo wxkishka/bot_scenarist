@@ -5,7 +5,7 @@ from config import (SYSTEM_CONTENT, MAX_TOKENS, GPT_URL,
 
 
 class GPT:
-    def __init__(self, system_content=''):
+    def __init__(self):
         self.system_content = SYSTEM_CONTENT
         self.URL = GPT_URL
         self.HEADERS = HEADERS
@@ -22,18 +22,17 @@ class GPT:
             print(f'Ошибка при подсчете токенов: {str(e)}')
             return 0
 
-    def process_resp(self, response) -> [bool, str]:
+    def process_resp(self, response):
         """Функция для проверки и обработки ответа сервера."""
         if response.status_code < 200 or response.status_code >= 300:
             self.clear_history()
-            return False, f'Ошибка: {response.status_code}'
-
+            return f'Ошибка: {response.status_code}'
         # Проверяю json
         try:
             full_response = response.json()
         except KeyError:
             self.clear_history()
-            return False, 'Ошибка получения JSON'
+            return 'Ошибка получения JSON'
 
         # Проверяю ошибки в ответе сервера.
         # if "error" in full_response or 'choices' not in full_response:
@@ -44,24 +43,22 @@ class GPT:
             result = full_response['choices'][0]['message']['content']
         except KeyError:
             self.clear_history()
-            return False, 'Ошибка: некорректная структура ответа модели.'
-
+            return 'Ошибка: некорректная структура ответа модели.'
         # Если content пустой, решение завершено.
         if result == '':
             self.clear_history()
-            return True, 'Решение завершено.'
-
+            return 'Решение завершено.'
         # Сохраняю сообщение в историю
         self.save_history(result)
-        return True, self.assistant_content
+        return self.assistant_content
 
-    def make_prompt(self, user_request):
+    def make_prompt(self, system_content, user_request, assistant_content):
         """Создаю промпт."""
         json = {
             "messages": [
-                {"role": "system", "content": self.system_content},
+                {"role": "system", "content": system_content},
                 {"role": "user", "content": user_request},
-                {"role": "assistant", "content": self.assistant_content}
+                {"role": "assistant", "content": assistant_content}
             ],
             "temperature": 1.2,
             "max_tokens": self.MAX_TOKENS,
@@ -73,9 +70,9 @@ class GPT:
         resp = requests.post(url=self.URL, headers=self.HEADERS, json=json)
         return resp
 
-    # def save_history(self, content_response):
-    #     """Функция для сохранени истории обращений."""
-    #     self.assistant_content += content_response
+    def save_history(self, content_response):
+        """Функция для сохранени истории обращений."""
+        self.assistant_content += content_response
 
     def save_history(self, content_response):
         """Функция для сохранени истории обращений."""
