@@ -1,5 +1,5 @@
 import sqlite3
-from config import DB_NAME
+from config import DB_NAME, MAX_USERS, MAX_SESSIONS
 
 
 def create_db():
@@ -14,17 +14,19 @@ def create_table():
         con = sqlite3.connect(DB_NAME)
         cur = con.cursor()
         sql = '''
-            CREATE TABLE IF NOT EXISTS users(
+            CREATE TABLE IF NOT EXISTS prompts(
                 id INTEGER PRIMARY KEY,
                 user_id INTEGER,
-                subject TEXT,
-                level TEXT,
-                task TEXT,
-                answer TEXT);
+                date DATETIME,
+                session_id INTEGER,
+                role TEXT,
+                content TEXT,
+                tokens INTEGER,
+                );
         '''
         cur.execute(sql)
     except sqlite3.Error as e:
-        print('Ошибка при создании таблицы users.', e)
+        print('Ошибка при создании таблицы prompts.', e)
     finally:
         con.close()
 
@@ -34,11 +36,11 @@ def insert_data(user_id, subject):
     try:
         con = sqlite3.connect(DB_NAME)
         cur = con.cursor()
-        sql = f'INSERT INTO users(user_id, subject) VALUES(?,?);'
+        sql = f'INSERT INTO prompts(user_id, subject) VALUES(?,?);'
         cur.execute(sql, (user_id, subject))
         con.commit()
     except sqlite3.Error as e:
-        print('Ошибка записи в таблицу users', e)
+        print('Ошибка записи в таблицу prompts', e)
     finally:
         con.close()
 
@@ -48,23 +50,23 @@ def update_data(user_id, column, value):
     try:
         con = sqlite3.connect(DB_NAME)
         cur = con.cursor()
-        sql = f'UPDATE users SET {column} = ? WHERE user_id = ?;'
+        sql = f'UPDATE prompts SET {column} = ? WHERE user_id = ?;'
         cur.execute(sql, (value, user_id))
         con.commit()
     except sqlite3.Error as e:
-        print('Ошибка изменения в таблице users', e)
+        print('Ошибка изменения в таблице prompts', e)
     finally:
         con.close()
 
 
-def delete_data(user_id):
-    """Функция удаления из БД данных пользователя."""
-    con = sqlite3.connect(DB_NAME)
-    cur = con.cursor()
-    sql = 'DELETE FROM users WHERE user_id = ?;'
-    cur.execute(sql, (user_id,))
-    con.commit()
-    con.close()
+# def delete_data(user_id):
+#     """Функция удаления из БД данных пользователя."""
+#     con = sqlite3.connect(DB_NAME)
+#     cur = con.cursor()
+#     sql = 'DELETE FROM users WHERE user_id = ?;'
+#     cur.execute(sql, (user_id,))
+#     con.commit()
+#     con.close()
 
 
 def select_data(user_id, column):
@@ -72,12 +74,12 @@ def select_data(user_id, column):
     try:
         con = sqlite3.connect(DB_NAME)
         cur = con.cursor()
-        sql = f'SELECT {column} FROM users WHERE user_id = ? LIMIT 1;'
+        sql = f'SELECT {column} FROM prompts WHERE user_id = ? LIMIT 1;'
         cur.execute(sql, (user_id,))
         res = cur.fetchone()
         return res
     except sqlite3.Error as e:
-        print('Ошибка обращения к таблице users', e)
+        print('Ошибка обращения к таблице prompts', e)
     finally:
         con.close()
 
@@ -86,8 +88,36 @@ def user_exists(user_id):
     """Функция определяет есть ли данные пользователя в БД."""
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
-    sql = 'SELECT count(*) FROM users WHERE user_id = ?;'
+    sql = 'SELECT count(*) FROM prompts WHERE user_id = ?;'
     cur.execute(sql, (user_id,))
     res = cur.fetchone()[0]
     con.close()
     return res != 0
+
+
+def is_limit_users():
+    con = sqlite3.connect(DB_NAME)
+    cur = con.cursor()
+    sql = 'SELECT count(DISTINCT user_id) FROM prompts;'
+    res = cur.execute(sql)
+    con.close()
+    return res > MAX_USERS
+
+
+def is_limit_sessions(user_id):
+    con = sqlite3.connect(DB_NAME)
+    cur = con.cursor()
+    sql = 'SELECT count(session_id) FROM prompts WHERE user_id = ?;'
+    res = cur.execute(sql, (user_id,))
+    return res > MAX_SESSIONS
+    con.close()
+
+def session_counter(user_id):
+    con = sqlite3.connect(DB_NAME)
+    cur = con.cursor()
+    sql = 'SELECT count(session_id) FROM prompts WHERE user_id = ?;'
+    res = cur.execute(sql, (user_id,))
+    res += 1
+    return res
+    con.close()
+
