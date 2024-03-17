@@ -4,9 +4,12 @@ import json
 import logging
 import requests
 import sqlite3
+from config import CONTINUE_STORY, END_STORY
+from bot import user_data
+from database import user_exists, current_session
 from config import (SYSTEM_CONTENT, MAX_TOKENS, GPT_URL,
                     HEADERS, ASSISTANT_CONTENT, FOLDER_ID,
-                    MODEL_URI, IAM_TOKEN, MAX_TOKENS_IN_SESSION,
+                    IAM_TOKEN, MAX_TOKENS_IN_SESSION,
                     LOG_PATH, TOKEN_PATH, METADATA_URL, METADATA_HEADERS,)
 
 
@@ -60,79 +63,15 @@ class GPT:
         )
 
 
-    def process_resp(self, response):
-        """Функция для проверки и обработки ответа сервера."""
-        if response.status_code < 200 or response.status_code >= 300:
-            self.clear_history()
-            return f'Ошибка: {response.status_code}'
-        # Проверяю json
-        try:
-            full_response = response.json()
-        except KeyError:
-            self.clear_history()
-            return 'Ошибка получения JSON'
-
-        # Проверяю ошибки в ответе сервера.
-        try:
-            result = full_response['result']['alternatives'][0]['message']['text']
-        except KeyError:
-            self.clear_history()
-            return 'Ошибка: некорректная структура ответа модели.'
-        # Если content пустой, решение завершено.
-        if result == '':
-            self.clear_history()
-            return 'Решение завершено.'
-        # Сохраняю сообщение в историю
-        self.save_history(result)
-        return self.assistant_content
-
-    def make_prompt(self, system_content, user_request, assistant_content):
-        """Создаю промпт."""
-        json = {
-            "modelUri": MODEL_URI,
-            "completionOptions": {
-                "stream": False,
-                "temperature": 0.6,
-                "maxTokens": self.MAX_TOKENS
-            },
-            "messages": [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_request},
-                {"role": "assistant", "content": assistant_content}
-            ]
-        }
-        return json
-
-    def send_request(self, json):
-        """Функция для отправки запроса на сервер нейросети."""
-        resp = requests.post(url=self.URL, headers=self.HEADERS, json=json)
-        return resp
-
-    def save_history(self, content_response):
-        """Функция для сохранени истории обращений."""
-        self.assistant_content += content_response
-
-    def save_history(self, content_response):
-        """Функция для сохранени истории обращений."""
-        if isinstance(content_response, str):
-            self.assistant_content += content_response
-        else:
-            print("Предупреждение: content_response не является строкой")
-
-    def clear_history(self):
-        """Функция для очистки истории обращений."""
-        self.assistant_content = ASSISTANT_CONTENT
-
-
     def is_tokens_limit(user_id, chat_id, bot):
         """Функция получает идентификатор пользователя, чата и самого бота,
            чтобы иметь возможность отправлять сообщения"""
         # Если такого пользователя нет в таблице, ничего делать не будем
-        if not is_value_in_table(DB_TABLE_PROMPTS_NAME, 'user_id', user_id):
+        if not user_exists(user_id):
             return
 
             # Берём из таблицы идентификатор сессии
-        session_id = get_user_session_id(user_id)
+        session_id = current_session(user_id)
         # Получаем из таблицы размер текущей сессии в токенах
         tokens_of_session = get_size_of_session(user_id, session_id)
 
@@ -142,13 +81,13 @@ class GPT:
                 chat_id,
                 f'Вы израсходовали все токены в этой сессии. Вы можете начать новую, введя help_with')
 
-        elif tokens_of_session + 50 >= MAX_TOKENS_IN_SESSION  # Если осталось меньше 50 токенов
+        elif tokens_of_session + 50 >= MAX_TOKENS_IN_SESSION:  # Если осталось меньше 50 токенов
             bot.send_message(
                 chat_id,
                 f'Вы приближаетесь к лимиту в {MAX_TOKENS_IN_SESSION} токенов в этой сессии. '
                 f'Ваш запрос содержит суммарно {tokens_of_session} токенов.')
 
-        elif tokens_of_session / 2 >= MAX_TOKENS_IN_SESSION  # Если осталось меньше половины
+        elif tokens_of_session / 2 >= MAX_TOKENS_IN_SESSION:  # Если осталось меньше половины
             bot.send_message(
                 chat_id,
                 f'Вы использовали больше половины токенов в этой сессии. '
@@ -191,3 +130,83 @@ def get_token():
         token = token_data['access_token']
     return token
 
+
+def create_prompt(user_id, user_data):
+    """ Функция создает промт для начала истории, используя выбор пользователя (жанр, герой и т.п.)
+        Принимает два параметра: user_data (словарь данных от пользователей)
+        и user_id (id конкретного пользователя)
+    """
+    # Начальный текст для нашей истории - вводная часть
+    prompt = SYSTEM_CONTENT
+    # Добавляем в начало истории инфу о жанре и главном герое, которых выбрал пользователь
+    prompt += (f"\nНапиши начало истории в стиле {user_data[user_id]['genre']} "
+              f"с главным героем {user_data[user_id]['character']}. "
+              f"Вот начальный сеттинг: \n{user_data[user_id]['setting']}. \n"
+              "Начало должно быть коротким, 1-3 предложения.\n")
+
+    # Если пользователь указал что-то еще в "дополнительной информации", добавляем это тоже
+    if user_data[user_id]['additional_info']:
+        prompt += (f"Также пользователь попросил учесть "
+                   f"следующую дополнительную информацию: {user_data[user_id]['additional_info']} ")
+
+    # Добавляем к prompt напоминание не давать пользователю лишних подсказок
+    prompt += 'Не пиши никакие подсказки пользователю, что делать дальше. Он сам знает'
+
+    # Возвращаем сформированный текст истории
+    return prompt
+
+
+def ask_gpt(collection, mode='continue'):
+    """Функция выполняет запрос к YandexGPT"""
+    # Замени <iam-токен> и <folder_id> на реальные значения для доступа к API
+    token = IAM_TOKEN  # IAM-токен для аутентификации
+    folder_id = FOLDER_ID # ID папки в облаке
+
+    # URL для запроса к YandexGPT
+    url = f"https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+    # Заголовки запроса, включая токен авторизации
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Данные для запроса, включая URI-модели, настройки и сообщения
+    data = {
+        "modelUri": f"gpt://{folder_id}/yandexgpt/latest",  # Адрес модели GPT
+        "completionOptions": {  # Опции генерации текста
+            "stream": False,  # Отключение потоковой передачи
+            "temperature": 0.6,  # Температура для вариативности ответов
+            "maxTokens": 200  # Максимальное количество токенов в ответе
+        },
+        "messages": []  # Список сообщений для истории
+    }
+
+    # Добавление сообщений из collection в данные запроса
+    for row in collection:
+        content = row['content']
+
+        # Добавление инструкций в зависимости от режима работы
+        if mode == 'continue' and row['role'] == 'user':
+            content += '\n' + CONTINUE_STORY
+        elif mode == 'end' and row['role'] == 'user':
+            content += '\n' + END_STORY
+
+        # Формирование сообщения для отправки
+        data["messages"].append({
+            "role": row["role"],  # Роль отправителя (пользователь или система)
+            "text": content  # Текст сообщения
+        })
+
+    # Отправка запроса и обработка ответа
+    try:
+        response = requests.post(url, headers=headers, json=data)  # Отправка запроса
+        if response.status_code != 200:
+            result = f"Status code {response.status_code}."  # Обработка ошибки статуса
+            return result
+        # Получение и возврат результата из ответа
+        result = response.json()['result']['alternatives'][0]['message']['text']
+    except Exception as e:
+        # Обработка исключения при запросе
+        result = "Произошла непредвиденная ошибка. Подробности см. в журнале."
+
+    return result  # Возвращаем результат

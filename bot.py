@@ -2,11 +2,12 @@ from telebot import TeleBot
 from telebot.types import ReplyKeyboardMarkup
 import logging
 import datetime
+import sqlite3
 from config import (TOKEN, SYSTEM_CONTENT, GENRES, ASSISTANT_CONTENT,
-                    CHARACTERS, SETTING, LOG_PATH,)
-from gpt import GPT
-from database import (create_db, create_table, insert_data,
-                      update_data, select_data, user_exists,
+                    CHARACTERS, SETTING, LOG_PATH, END_STORY)
+from gpt import GPT, ask_gpt, create_prompt
+from database import (create_db, create_table, insert_data_into_db,
+                      current_session, select_role_content, user_exists,
                       is_limit_users, is_limit_sessions, session_counter)
 
 bot = TeleBot(TOKEN)
@@ -86,9 +87,23 @@ def setting_proc(message):
     """Функция принимает и записывает вселенную истории."""
     user_id = message.from_user.id
     user_data[user_id]['setting']= message.text
-    bot.send_message(message.chat.id, 'Если хочешь начать, нажми Начать.',
+    bot.send_message(message.chat.id, 'Если хочешь начать, нажми "Начать".\n'
+                     'или напиши дополнительную информацию для нейросети.',
                      reply_markup=create_keyboard('начать'))
-    bot.register_next_step_handler(message, get_prompt)
+    bot.register_next_step_handler(message, additional_info_proc)
+
+
+def additional_info_proc(message):
+    """Функция-обработчик. Обрабатывает комманды 'начать' или записывает
+        дополнительную информация для создания сценария."""
+    user_id = message.from_user.id
+    if message.text == 'начать':
+        story_handler(message)
+    else:
+        user_data[user_id]['add_info'] = message.text
+        bot.send_message(message.chat.id, 'Дополнительная информация прнята.\n'
+                         'нажми "начать", и начнём писать сценарий!',
+                         reply_markup=create_keyboard('начать'))
 
 @bot.message_handler(commands=['debug'])
 def send_logs(message):
@@ -97,32 +112,64 @@ def send_logs(message):
         bot.send_document(message.chat.id, f)
 
 
-def continue_filter(message):
-    """Функция-фильтр кнопки Продолжить."""
-    button_text = 'continue'
-    return message.text == button_text
-
-
-@bot.message_handler(func=continue_filter)
-def get_prompt(message):
-    """Функция проверяет вопрос пользователя перед формированием промпта."""
+@bot.message_handler(content_types=['text'])
+def story_handler(message, mode = 'continue'):
+    """Функция-обработчик написания сценария. Инициирует создание промпта.
+       Вызывает функцию обращения к нейросети, отслеживает действия пользователя
+       при написании сценария."""
     user_id = message.from_user.id
-    system_content = SYSTEM_CONTENT
-    assistant_content = ASSISTANT_CONTENT
-    user_content = (f'Напиши сценарий для {user_data[user_id]["setting"]}, '
-                   f' в жанре {user_data[user_id]["genre"]}, '
-                   f'в главной роли {user_data[user_id]["character"]}.')
+    session_id = current_session(user_id)
+    user_content = message.text
+    if mode == 'end':
+        user_content = END_STORY
+    
+    row: sqlite3.Row = select_role_content(user_id, session_id)
+    collection: sqlite3.Row = select_role_content(user_id, session_id)
+    collection.append({'role': 'user', 'content': user_content})
 
-    # Формирую промпт, и отправляю в нейросеть.
-    prompt = gpt.make_prompt(system_content, user_content, assistant_content)
-    logging.info(f'Запрос пользователя к GPT: {prompt}.')
-    resp = gpt.send_request(prompt)
-    answer = gpt.process_resp(resp)
-    assistant_content += answer
-    update_data(user_id, 'answer', assistant_content)
-    print(select_data(user_id, 'answer')[0])
-    bot.send_message(user_id, answer,
-                     reply_markup=create_keyboard(['continue', 'finish']))
+    tokens = GPT.count_tokens_in_dialog(collection)
+
+    if GPT.is_tokens_limit(message, tokens, bot):
+        return
+    
+    insert_data_into_db(user_id, datetime.now(),session_id, 'user',user_content, tokens)
+
+    if GPT.is_tokens_limit(message,tokens, bot):
+        return
+    
+    gpt_answer = ask_gpt(collection, mode)
+
+    collection: sqlite3.Row = select_role_content(user_id, session_id)
+    collection.append({'role':'assistant', 'content': gpt_answer})
+    tokens = GPT.count_tokens_in_dialog(collection)
+
+    insert_data_into_db(user_id, datetime.now(), session_id, 'assistant',
+                        gpt_answer, tokens)
+
+    bot.send_message(message.chat.id, gpt_answer,
+                     reply_markup=create_keyboard('continue', 'end'))
+
+
+@bot.message_handler(content_types=['text'])
+def story_init(message):
+    """Функция-обработчик команды первого запроса создания сценария."""
+    user_id = message.from_user.id
+
+    if user_exists(user_id):
+        session_id = session_counter(user_id)
+        row:sqlite3.Row = select_role_content(user_id)
+
+    user_content = create_prompt(user_data, user_id)
+
+    collection: sqlite3.Row = select_role_content(user_id, session_id)
+    collection.append({'role':'system', 'content': 'user_content'})
+    tokens = GPT.count_tokens_in_dialogcount_tokens(collection)
+
+    insert_data_into_db(user_id, datetime.now(), session_id, 'system',
+                         user_content, tokens)
+
+    collection: sqlite3.Row = select_role_content(user_id, session_id)
+    
 
 
 def end_filter(message):

@@ -31,7 +31,7 @@ def create_table():
         con.close()
 
 
-def insert_data(user_id, subject):
+def insert_data_into_db(user_id, subject):
     """Функция сохранения user_id и предмета задачи в БД."""
     try:
         con = sqlite3.connect(DB_NAME)
@@ -69,14 +69,14 @@ def update_data(user_id, column, value):
 #     con.close()
 
 
-def select_data(user_id, column):
+def select_role_content(user_id, session_id):
     """Функция выводит данные о пользователе по user_id."""
     try:
         con = sqlite3.connect(DB_NAME)
         cur = con.cursor()
-        sql = f'SELECT {column} FROM prompts WHERE user_id = ? LIMIT 1;'
-        cur.execute(sql, (user_id,))
-        res = cur.fetchone()
+        sql = f'SELECT role, content FROM prompts WHERE user_id = ? and session_id = ?;'
+        cur.execute(sql, (user_id,session_id,))
+        res = cur.fetchall()
         return res
     except sqlite3.Error as e:
         print('Ошибка обращения к таблице prompts', e)
@@ -121,3 +121,10 @@ def session_counter(user_id):
     return res
     con.close()
 
+def current_session(user_id):
+    con = sqlite3.connect(DB_NAME)
+    cur = con.cursor()
+    sql = 'SELECT max(session_id) FROM prompts WHERE user_id = ?;'
+    res = cur.execute(sql, (user_id,))
+    return res
+    con.close()
