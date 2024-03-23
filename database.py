@@ -21,7 +21,7 @@ def create_table():
                 session_id INTEGER,
                 role TEXT,
                 content TEXT,
-                tokens INTEGER,
+                tokens INTEGER
                 );
         '''
         cur.execute(sql)
@@ -60,20 +60,11 @@ def update_data(user_id, column, value):
         con.close()
 
 
-# def delete_data(user_id):
-#     """Функция удаления из БД данных пользователя."""
-#     con = sqlite3.connect(DB_NAME)
-#     cur = con.cursor()
-#     sql = 'DELETE FROM users WHERE user_id = ?;'
-#     cur.execute(sql, (user_id,))
-#     con.commit()
-#     con.close()
-
-
 def select_role_content(user_id, session_id):
     """Функция выводит данные о пользователе по user_id."""
     try:
         con = sqlite3.connect(DB_NAME)
+        con.row_factory = sqlite3.Row
         cur = con.cursor()
         sql = f'SELECT role, content FROM prompts WHERE user_id = ? and session_id = ?;'
         cur.execute(sql, (user_id, session_id, ))
@@ -97,37 +88,63 @@ def user_exists(user_id):
 
 
 def is_limit_users():
+    """Функция проверяет лимит превышения пользователей."""
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
     sql = 'SELECT count(DISTINCT user_id) FROM prompts;'
-    res = cur.execute(sql)
+    res = cur.execute(sql).fetchone()[0]
     con.close()
     return res > MAX_USERS
 
 
 def is_limit_sessions(user_id):
+    """Функция проверяет превышение лимита сессий пользователя."""
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
-    sql = 'SELECT count(session_id) FROM prompts WHERE user_id = ?;'
-    res = cur.execute(sql, (user_id,))
+    sql = 'SELECT COUNT(DISTINCT session_id) FROM prompts WHERE user_id = ?;'
+    res = cur.execute(sql, (user_id,)).fetchone()[0]
     con.close()
     return res > MAX_SESSIONS
 
 
 def session_counter(user_id):
+    """Функция - счетчик сессий."""
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
-    sql = 'SELECT count(session_id) FROM prompts WHERE user_id = ?;'
-    res = cur.execute(sql, (user_id,))
+    sql = 'SELECT COUNT(DISTINCT session_id) FROM prompts WHERE user_id = ?;'
+    res = cur.execute(sql, (user_id,)).fetchone()[0]
     res += 1
     con.close()
     return res
 
 
 def current_session(user_id):
+    """Функция определяет номер текущей сессии."""
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
     sql = 'SELECT max(session_id) FROM prompts WHERE user_id = ?;'
-    res = cur.execute(sql, (user_id,))
+    res = cur.execute(sql, (user_id,)).fetchone()[0]
+    con.close()
+    return res
+
+
+def tokens_in_session(user_id):
+    """Функция определяет количество токенов в одной сессии."""
+    con = sqlite3.connect(DB_NAME)
+    cur = con.cursor()
+    sql = ('SELECT tokens FROM prompts WHERE user_id = ?' 
+           'AND role = "assistant"  ORDER BY date DESC;')
+    res = cur.execute(sql, (user_id,)).fetchone()[0]
+    con.close()
+    return res
+
+
+def whole_story_db(user_id):
+    """Функция выводит текст сценария целиком."""
+    con = sqlite3.connect(DB_NAME)
+    cur = con.cursor()
+    sql = ('SELECT content FROM prompts WHERE user_id = ?' 
+           'AND role = "assistant"  ORDER BY date DESC;')
+    res = cur.execute(sql, (user_id,)).fetchone()[0]
     con.close()
     return res

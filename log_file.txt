@@ -1,0 +1,2 @@
+2024-03-23 19:46:18,646 - root - ERROR - Ошибка при получении токена: HTTPConnectionPool(host='169.254.169.254', port=80): Max retries exceeded with url: /computeMetadata/v1/instance/service-accounts/default/token (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x00000212BD1253D0>, 'Connection to 169.254.169.254 timed out. (connect timeout=None)'))
+2024-03-23 19:46:18,683 - root - INFO - Бот запущен
