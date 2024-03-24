@@ -231,7 +231,6 @@ def story_handler(message, mode='continue'):
        Вызывает функцию обращения к нейросети, отслеживает действия пользователя
        при написании сценария."""
     buttons = ['/end']
-    end_buttons = ['/new_story', '/whole_story','/all_tokens', '/debug']
     user_id = message.from_user.id
     session_id = current_session(user_id)
     user_content = message.text
