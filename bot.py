@@ -65,7 +65,6 @@ def whole_story(message):
 def end_task(message):
     """Функция-обработчик команды 'end'."""
     buttons = ['/new_story', '/whole_story', '/all_tokens', '/debug']
-    print('Функция завершения истории')
     if not user_exists:
         bot.send_message(message.chat.id, 'Ты еще не начал ни одного сценария \n'
                          'нажми конопку "begin" и начни свой сценарий.')
@@ -263,30 +262,6 @@ def story_handler(message, mode='continue'):
 
     bot.send_message(message.chat.id, gpt_answer,
                      reply_markup=create_keyboard(buttons))
-
-
-# def end_filter(message):
-#     """Функция-фильтр кнопки Завершить."""
-#     button_text = 'end'
-#     return message.text == button_text
-
-
-# @bot.message_handler(content_types=['text'], func=end_filter)
-# @bot.message_handler(commands=['end'])
-# def end_task(message):
-#     """Функция-обработчик команды 'end'."""
-#     buttons = ['/new_story', '/whole_story', '/all_tokens', '/debug']
-#     # user_id = message.from_user.id
-#     print('Функция завершения истории')
-#     if not user_exists:
-#         bot.send_message(message.chat.id, 'Ты еще не начал ни одного сценария \n'
-#                          'нажми конопку "begin" и начни свой сценарий.')
-#         return
-#     story = story_handler(message, mode='end')
-#     bot.send_message(message.chat.id, story)
-
-#     bot.send_message(message.chat.id, 'Написание сценария завершено.',
-#                      reply_markup=create_keyboard(buttons))
 
 
 # if __name__ == "__main__":
