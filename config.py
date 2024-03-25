@@ -1,12 +1,10 @@
-# TOKEN = '6787855008:AAFNpFZ-Y1DD_x1mV0UYoPqH0AVwTW9iacQ'
-
 # Раздел настроек для получения и обновления IAM_TOKEN
 METADATA_URL = 'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token'
 METADATA_HEADERS = {'Metadata-Flavor': "Google"}
 TOKEN_PATH = 'iam_token.json'
 
 # Раздел для телеграмм токена и базовых файлов.
-TOKEN = '5924781016:AAFe6DmVlFmhFGWE18Y-wSfFN6gcHzrh3Zk'
+TOKEN = '6787855008:AAFNpFZ-Y1DD_x1mV0UYoPqH0AVwTW9iacQ'
 DB_NAME = 'db.sqlite'
 LOG_PATH = 'log_file.txt'
 
