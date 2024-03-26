@@ -61,6 +61,19 @@ def whole_story(message):
         bot.send_message(chat_id, f'При получении истории произошла ошибка {e}.')
 
 
+@bot.message_handler(commands=['end'])
+def end_task(message):
+    """Функция-обработчик команды 'end'."""
+    buttons = ['/new_story', '/whole_story', '/all_tokens', '/debug']
+    if not user_exists:
+        bot.send_message(message.chat.id, 'Ты еще не начал ни одного сценария \n'
+                         'нажми конопку "begin" и начни свой сценарий.')
+        return
+    story_handler(message, mode='end')
+    bot.send_message(message.chat.id, 'Написание сценария завершено.',
+                     reply_markup=create_keyboard(buttons))
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
     """Функция-обработчик команды start"""
@@ -153,7 +166,7 @@ def create_prompt(user_id):
     prompt = ''
     # Заполняем промпт данными для сценария.
     prompt += (f"\nНапиши начало истории в стиле {user_data[user_id]['genre']} "
-               f"с главным героем {user_data[user_id]['character']}."
+               f"с главным героем {user_data[user_id]['character']}. "
                f"Вот начальный сеттинг: \n{user_data[user_id]['setting']}. \n"
                "Начало должно быть коротким, 1-3 предложения.\n")
 
@@ -169,8 +182,6 @@ def story_init(message):
     user_id = message.from_user.id
     buttons = ['/end']
     butn_if_exceded = ['/start', '/end']
-    if message.text == '/end':
-        bot.register_next_step_handler(message, end_task)
     if not user_exists(user_id):
         session_id = 1
     else:
@@ -220,13 +231,11 @@ def story_handler(message, mode='continue'):
        Вызывает функцию обращения к нейросети, отслеживает действия пользователя
        при написании сценария."""
     buttons = ['/end']
-    # end_buttons = ['/new_story', '/whole_story','/all_tokens', '/debug']
     user_id = message.from_user.id
     session_id = current_session(user_id)
     user_content = message.text
     if mode == 'end':
         user_content = END_STORY
-        print(user_content)
 
     collection: sqlite3.Row = select_role_content(user_id, session_id)
     collection.append({'role': 'user', 'content': user_content})
@@ -252,30 +261,6 @@ def story_handler(message, mode='continue'):
 
     bot.send_message(message.chat.id, gpt_answer,
                      reply_markup=create_keyboard(buttons))
-
-
-# def end_filter(message):
-#     """Функция-фильтр кнопки Завершить."""
-#     button_text = 'end'
-#     return message.text == button_text
-
-
-# @bot.message_handler(content_types=['text'], func=end_filter)
-@bot.message_handler(commands=['end'])
-def end_task(message):
-    """Функция-обработчик команды 'end'."""
-    buttons = ['/new_story', '/whole_story', '/all_tokens', '/debug']
-    # user_id = message.from_user.id
-    print('Функция завершения истории')
-    if not user_exists:
-        bot.send_message(message.chat.id, 'Ты еще не начал ни одного сценария \n'
-                         'нажми конопку "begin" и начни свой сценарий.')
-        return
-    story = story_handler(message, mode='end')
-    bot.send_message(message.chat.id, story)
-
-    bot.send_message(message.chat.id, 'Написание сценария завершено.',
-                     reply_markup=create_keyboard(buttons))    
 
 
 # if __name__ == "__main__":

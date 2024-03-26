@@ -1,12 +1,11 @@
-# import os.path
 import time
 import json
 import logging
 import requests
 import sqlite3
-from config import (GPT_URL, FOLDER_ID,MAX_TOKENS_IN_SESSION, LOG_PATH,
+from config import (GPT_URL, FOLDER_ID, MAX_TOKENS_IN_SESSION, LOG_PATH,
                     TOKEN_PATH, METADATA_URL, METADATA_HEADERS,
-                    CONTINUE_STORY, END_STORY, MODEL_URI)
+                    CONTINUE_STORY, END_STORY,)
 
 # Указываю параметры логирования.
 logging.basicConfig(
@@ -16,6 +15,7 @@ logging.basicConfig(
     encoding='UTF-8',
     filemode='w'
 )
+
 
 def get_token():
     """Функция возвращает IAM_Token."""
@@ -48,12 +48,13 @@ def create_token():
             with open(TOKEN_PATH, 'w') as token_file:
                 json.dump(token_data, token_file)
         else:
-            logging.error((f'Не удалось обновить токен: {response.status_code}'))
+            logging.error(f'Не удалось обновить токен: {response.status_code}')
     except Exception as e:
         logging.error(f'Ошибка при получении токена: {e}')
 
 
 IAM_TOKEN = get_token()
+
 
 def count_tokens(text):
     """Функция подсчитывает количество токенов в сообщении."""
